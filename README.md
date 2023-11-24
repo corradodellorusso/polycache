@@ -2,7 +2,7 @@
 [![codecov](https://codecov.io/gh/corradodellorusso/polycache/branch/master/graph/badge.svg?token=ZV3G5IFigq)](https://codecov.io/gh/corradodellorusso/polycache)
 [![tests](https://github.com/corradodellorusso/polycache/actions/workflows/test.yml/badge.svg)](https://github.com/corradodellorusso/polycache/actions/workflows/test.yml)
 [![license](https://img.shields.io/github/license/corradodellorusso/polycache)](https://github.com/corradodellorusso/polycache/blob/master/LICENSE)
-[![npm](https://img.shields.io/npm/dm/polycache-core)](https://npmjs.com/package/cache-manager)
+[![npm](https://img.shields.io/npm/dm/polycache-core)](https://npmjs.com/package/polycache-core)
 ![npm](https://img.shields.io/npm/v/polycache-core)
 
 # Flexible NodeJS cache module
@@ -20,14 +20,14 @@ A cache module for nodejs that allows easy wrapping of functions in cache, tiere
 
 ## Installation
 
-    npm install cache-manager
+    npm install polycache-core
 
 ## Usage Examples
 
 ### Single Store
 
 ```typescript
-import { caching } from 'cache-manager';
+import { caching } from 'polycache-core';
 
 const memoryCache = await caching('memory', {
   max: 100,
@@ -80,7 +80,7 @@ Under construction...
 ### Multi-Store
 
 ```typescript
-import { multiCaching } from 'cache-manager';
+import { multiCaching } from 'polycache-core';
 
 const multiCache = multiCaching([memoryCache, someOtherCache]);
 const userId2 = 456;

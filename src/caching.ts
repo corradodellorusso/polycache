@@ -1,108 +1,41 @@
 import { coalesceAsync } from 'promise-coalesce';
-import { MemoryCache, MemoryConfig, memoryStore } from './stores';
-
-export type Config = {
-  ttl?: Milliseconds;
-  refreshThreshold?: Milliseconds;
-  isCacheable?: (val: unknown) => boolean;
-};
-
-export type Milliseconds = number;
-/**
- * @deprecated will remove after 5.2.0. Use Milliseconds instead
- */
-export type Ttl = Milliseconds;
-
-export type Store = {
-  get<T>(key: string): Promise<T | undefined>;
-  set<T>(key: string, data: T, ttl?: Milliseconds): Promise<void>;
-  del(key: string): Promise<void>;
-  reset(): Promise<void>;
-  mset(args: [string, unknown][], ttl?: Milliseconds): Promise<void>;
-  mget(...args: string[]): Promise<unknown[]>;
-  mdel(...args: string[]): Promise<void>;
-  keys(pattern?: string): Promise<string[]>;
-  ttl(key: string): Promise<number>;
-};
-
-export type StoreConfig = Config;
-
-export type FactoryConfig<T> = T & Config;
-export type FactoryStore<S extends Store, T extends object = never> = (
-  config?: FactoryConfig<T>,
-) => S | Promise<S>;
-
-export type Stores<S extends Store, T extends object> =
-  | 'memory'
-  | Store
-  | FactoryStore<S, T>;
-export type CachingConfig<T> = MemoryConfig | StoreConfig | FactoryConfig<T>;
-export type WrapTTL<T> = Milliseconds | ((v: T) => Milliseconds);
-export type Cache<S extends Store = Store> = {
-  set: (key: string, value: unknown, ttl?: Milliseconds) => Promise<void>;
-  get: <T>(key: string) => Promise<T | undefined>;
-  del: (key: string) => Promise<void>;
-  reset: () => Promise<void>;
-  wrap<T>(key: string, fn: () => Promise<T>, ttl?: WrapTTL<T>): Promise<T>;
-  store: S;
-};
-
-export async function caching(
-  name: 'memory',
-  args?: MemoryConfig,
-): Promise<MemoryCache>;
-export async function caching<S extends Store>(store: S): Promise<Cache<S>>;
-export async function caching<S extends Store, T extends object = never>(
-  factory: FactoryStore<S, T>,
-  args?: FactoryConfig<T>,
-): Promise<Cache<S>>;
+import { resolveTTL } from './utils';
+import { Cache, CacheOptions, Milliseconds, Store, WrapOptions } from './types';
 
 /**
  * Generic caching interface that wraps any caching library with a compatible interface.
  */
-export async function caching<S extends Store, T extends object = never>(
-  factory: Stores<S, T>,
-  args?: CachingConfig<T>,
-): Promise<Cache<S> | MemoryCache> {
-  let store: Store;
-  if (factory === 'memory') store = memoryStore(args as MemoryConfig);
-  else if (typeof factory === 'function')
-    store = await factory(args as FactoryConfig<T>);
-  else store = factory;
+export const caching = <S extends Store>(store: Store, cacheOptions?: CacheOptions): Cache<S> => ({
+  /**
+   * Wraps a function in cache. I.e., the first time the function is run,
+   * its results are stored in cache so subsequent calls retrieve from cache
+   * instead of calling the function.
 
-  return {
-    /**
-     * Wraps a function in cache. I.e., the first time the function is run,
-     * its results are stored in cache so subsequent calls retrieve from cache
-     * instead of calling the function.
-
-     * @example
-     * const result = await cache.wrap('key', () => Promise.resolve(1));
-     *
-     */
-    wrap: async <T>(key: string, fn: () => Promise<T>, ttl?: WrapTTL<T>) => {
-      return coalesceAsync(key, async () => {
-        const value = await store.get<T>(key);
-        if (value === undefined) {
-          const result = await fn();
-          const cacheTTL = typeof ttl === 'function' ? ttl(result) : ttl;
-          await store.set<T>(key, result, cacheTTL);
-          return result;
-        } else if (args?.refreshThreshold) {
-          const cacheTTL = typeof ttl === 'function' ? ttl(value) : ttl;
-          const remainingTtl = await store.ttl(key);
-          if (remainingTtl !== -1 && remainingTtl < args.refreshThreshold) {
-            fn().then((result) => store.set<T>(key, result, cacheTTL));
-          }
+   * @example
+   * const result = await cache.wrap('key', () => Promise.resolve(1));
+   *
+   */
+  wrap: async <T>(key: string, fn: () => Promise<T>, options?: WrapOptions<T>) => {
+    return coalesceAsync(key, async () => {
+      const value = await store.get<T>(key);
+      if (value === undefined) {
+        const result = await fn();
+        const cacheTTL = resolveTTL(result, options?.ttl);
+        await store.set<T>(key, result, cacheTTL);
+        return result;
+      } else if (cacheOptions?.refreshThreshold) {
+        const cacheTTL = resolveTTL(value, options?.ttl);
+        const remainingTtl = await store.ttl(key);
+        if (remainingTtl !== -1 && remainingTtl < cacheOptions?.refreshThreshold) {
+          fn().then((result) => store.set<T>(key, result, cacheTTL));
         }
-        return value;
-      });
-    },
-    store: store as S,
-    del: (key: string) => store.del(key),
-    get: <T>(key: string) => store.get<T>(key),
-    set: (key: string, value: unknown, ttl?: Milliseconds) =>
-      store.set(key, value, ttl),
-    reset: () => store.reset(),
-  };
-}
+      }
+      return value;
+    });
+  },
+  store: store as S,
+  del: (key: string) => store.del(key),
+  get: <T>(key: string) => store.get<T>(key),
+  set: (key: string, value: unknown, ttl?: Milliseconds) => store.set(key, value, ttl),
+  reset: () => store.reset(),
+});

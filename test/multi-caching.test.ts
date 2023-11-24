@@ -3,19 +3,13 @@ import { faker } from '@faker-js/faker';
 
 import { sleep } from './utils';
 
-import {
-  Cache,
-  caching,
-  MemoryCache,
-  MultiCache,
-  multiCaching,
-  Store,
-} from '../src';
+import { Cache, caching, MultiCache, multiCaching, Store } from '../src';
+import { lruStore } from '../src/stores';
 
 describe('multiCaching', () => {
-  let memoryCache: MemoryCache;
-  let memoryCache2: MemoryCache;
-  let memoryCache3: MemoryCache;
+  let memoryCache: Cache;
+  let memoryCache2: Cache;
+  let memoryCache3: Cache;
   let multiCache: MultiCache;
   let ttl: number;
   let defaultTtl: number;
@@ -38,15 +32,21 @@ describe('multiCaching', () => {
     ttl = 100;
     defaultTtl = 5000;
 
-    memoryCache = await caching('memory', {
-      ttl,
-    });
-    memoryCache2 = await caching('memory', {
-      ttl,
-    });
-    memoryCache3 = await caching('memory', {
-      ttl,
-    });
+    memoryCache = caching(
+      lruStore({
+        ttl,
+      }),
+    );
+    memoryCache2 = caching(
+      lruStore({
+        ttl,
+      }),
+    );
+    memoryCache3 = caching(
+      lruStore({
+        ttl,
+      }),
+    );
 
     key = faker.string.sample(20);
   });
@@ -82,29 +82,23 @@ describe('multiCaching', () => {
         await expect(memoryCache.get(key)).resolves.toEqual(value);
         await expect(memoryCache2.get(key)).resolves.toEqual(value);
         await expect(memoryCache3.get(key)).resolves.toEqual(value);
-        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(
-          value,
-        );
+        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(value);
       });
 
       it('lets us set the ttl to be milliseconds', async () => {
         const ttl = 2 * 1000;
-        await multiCache.wrap(key, async () => value, ttl);
+        await multiCache.wrap(key, async () => value, { ttl });
 
         await expect(memoryCache.get(key)).resolves.toEqual(value);
         await expect(memoryCache2.get(key)).resolves.toEqual(value);
         await expect(memoryCache3.get(key)).resolves.toEqual(value);
-        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(
-          value,
-        );
+        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(value);
 
         await sleep(ttl);
         await expect(memoryCache.get(key)).resolves.toBeUndefined();
         await expect(memoryCache2.get(key)).resolves.toBeUndefined();
         await expect(memoryCache3.get(key)).resolves.toBeUndefined();
-        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(
-          'foo',
-        );
+        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual('foo');
       });
 
       it('lets us set the ttl to be a function', async () => {
@@ -112,21 +106,17 @@ describe('multiCaching', () => {
         const sec = faker.number.int({ min: 2, max: 4 });
         value = faker.string.sample(sec * 2);
         const fn = vi.fn((v: string) => (v.length / 2) * 1000);
-        await multiCache.wrap(key, async () => value, fn);
+        await multiCache.wrap(key, async () => value, { ttl: fn });
         await expect(memoryCache.get(key)).resolves.toEqual(value);
         await expect(memoryCache2.get(key)).resolves.toEqual(value);
         await expect(memoryCache3.get(key)).resolves.toEqual(value);
-        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(
-          value,
-        );
+        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(value);
         expect(fn).toHaveBeenCalledTimes(1);
         await sleep(sec * 1000);
         await expect(memoryCache.get(key)).resolves.toBeUndefined();
         await expect(memoryCache2.get(key)).resolves.toBeUndefined();
         await expect(memoryCache3.get(key)).resolves.toBeUndefined();
-        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual(
-          'foo',
-        );
+        await expect(multiCache.wrap(key, async () => 'foo')).resolves.toEqual('foo');
       });
     });
 
@@ -170,9 +160,7 @@ describe('multiCaching', () => {
         const len = 4;
         await multiMset();
         const args = new Array(len).fill('').map(() => faker.string.sample());
-        await expect(multiCache.mget(...args)).resolves.toStrictEqual(
-          new Array(len).fill(undefined),
-        );
+        await expect(multiCache.mget(...args)).resolves.toStrictEqual(new Array(len).fill(undefined));
       });
     });
 
@@ -236,8 +224,8 @@ describe('multiCaching', () => {
 
   describe('issues', () => {
     it('#253', async () => {
-      const cache0 = await caching('memory', { ttl: 500 });
-      const cache1 = await caching('memory', { ttl: 1000 });
+      const cache0 = caching(lruStore({ ttl: 500 }));
+      const cache1 = caching(lruStore({ ttl: 1000 }));
       const multi = multiCaching([cache0, cache1]);
       const key = 'bar';
       const value = 'foo';
@@ -253,36 +241,6 @@ describe('multiCaching', () => {
 
       await expect(cache0.get(key)).resolves.toEqual(value);
       await expect(cache1.get(key)).resolves.toEqual(value);
-    });
-
-    it('#533', () => {
-      expect(
-        (async () => {
-          const cache0 = await caching('memory', {
-            ttl: 5 * 1000,
-            refreshThreshold: 4 * 1000,
-          });
-          const cache1 = await caching('memory', {
-            ttl: 10 * 1000,
-            refreshThreshold: 8 * 1000,
-          });
-          const multi = multiCaching([cache0, cache1]);
-
-          await multi.wrap('refreshThreshold', async () => 0);
-          await new Promise((resolve) => {
-            setTimeout(resolve, 2 * 1000);
-          });
-          await multi.wrap('refreshThreshold', async () => 1);
-          await new Promise((resolve) => {
-            setTimeout(resolve, 500);
-          });
-          await multi.wrap('refreshThreshold', async () => 2);
-          await new Promise((resolve) => {
-            setTimeout(resolve, 500);
-          });
-          return multi.wrap('refreshThreshold', async () => 3);
-        })(),
-      ).resolves.toEqual(1);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { LRUCache } from 'lru-cache';
 import cloneDeep from 'lodash.clonedeep';
 
-import { Config, Cache, Store } from '../caching';
+import { Store } from '../types';
 
 function clone<T>(object: T): T {
   if (typeof object === 'object' && object !== null) {
@@ -10,30 +10,26 @@ function clone<T>(object: T): T {
   return object;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LRU = LRUCache<string, any, unknown>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Pre = LRUCache.OptionsTTLLimit<string, any, unknown>;
-type Options = Omit<Pre, 'ttlAutopurge'> & Partial<Pick<Pre, 'ttlAutopurge'>>;
-export type MemoryConfig = {
-  max?: number;
-  sizeCalculation?: (value: unknown, key: string) => number;
-  shouldCloneBeforeSet?: boolean;
-} & Options &
-  Config;
+type LRUOptions = Omit<LRUCache.Options<string, any, unknown>, 'ttlAutopurge'> &
+  Partial<Pick<LRUCache.Options<string, any, unknown>, 'ttlAutopurge'>>;
 
-export type MemoryStore = Store & {
+export type LRUConfig = {
+  shouldCloneBeforeSet?: boolean;
+  isCacheable?: (val: unknown) => boolean;
+} & LRUOptions;
+
+export type LRUStore = Store & {
   get size(): number;
   dump: LRU['dump'];
   load: LRU['load'];
   calculatedSize: LRU['calculatedSize'];
 };
-export type MemoryCache = Cache<MemoryStore>;
 
 /**
  * Wrapper for lru-cache.
  */
-export function memoryStore(args?: MemoryConfig): MemoryStore {
+export function lruStore(args?: LRUConfig): LRUStore {
   const shouldCloneBeforeSet = args?.shouldCloneBeforeSet !== false; // clone by default
   const isCacheable = args?.isCacheable ?? ((val) => val !== undefined);
 
@@ -47,35 +43,43 @@ export function memoryStore(args?: MemoryConfig): MemoryStore {
   const lruCache = new LRUCache(lruOpts);
 
   return {
-    async del(key) {
+    del: async (key) => {
       lruCache.delete(key);
     },
     get: async <T>(key: string) => lruCache.get(key) as T,
     keys: async () => [...lruCache.keys()],
     mget: async (...args) => args.map((x) => lruCache.get(x)),
-    async mset(args, ttl?) {
+    mset: async (args, ttl?) => {
       const opt = { ttl: ttl !== undefined ? ttl : lruOpts.ttl } as const;
       for (const [key, value] of args) {
-        if (!isCacheable(value))
+        if (!isCacheable(value)) {
+          // TODO: this should probably be configurable
           throw new Error(`no cacheable value ${JSON.stringify(value)}`);
-        if (shouldCloneBeforeSet) lruCache.set(key, clone(value), opt);
-        else lruCache.set(key, value, opt);
+        }
+        if (shouldCloneBeforeSet) {
+          lruCache.set(key, clone(value), opt);
+        } else {
+          lruCache.set(key, value, opt);
+        }
       }
     },
-    async mdel(...args) {
-      for (const key of args) lruCache.delete(key);
+    mdel: async (...args) => {
+      for (const key of args) {
+        lruCache.delete(key);
+      }
     },
-    async reset() {
+    reset: async () => {
       lruCache.clear();
     },
     ttl: async (key) => lruCache.getRemainingTTL(key),
-    async set(key, value, opt) {
-      if (!isCacheable(value))
+    set: async (key, value, opt) => {
+      if (!isCacheable(value)) {
         throw new Error(`no cacheable value ${JSON.stringify(value)}`);
-      if (shouldCloneBeforeSet) value = clone(value);
-
+      }
+      if (shouldCloneBeforeSet) {
+        value = clone(value);
+      }
       const ttl = opt !== undefined ? opt : lruOpts.ttl;
-
       lruCache.set(key, value, { ttl });
     },
     get calculatedSize() {

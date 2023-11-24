@@ -2,25 +2,23 @@ import { faker } from '@faker-js/faker';
 import promiseCoalesce from 'promise-coalesce';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Cache, MemoryConfig, caching, memoryStore } from '../src';
+import { Cache, caching } from '../src';
 import { sleep } from './utils';
+import { lruStore } from '../src/stores';
 
 // Allow the module to be mocked so we can assert
 // the old and new behavior for issue #417
 vi.mock('promise-coalesce', async () => {
-  const actualModule =
-    await vi.importActual<typeof promiseCoalesce>('promise-coalesce');
+  const actualModule = await vi.importActual<typeof promiseCoalesce>('promise-coalesce');
 
   return {
     ...actualModule,
-    coalesceAsync: vi
-      .fn()
-      .mockImplementation((key: string, fn: () => Promise<unknown>) => {
-        if (key.startsWith('mock_no_coalesce')) {
-          return Promise.resolve(fn());
-        }
-        return actualModule.coalesceAsync(key, fn);
-      }),
+    coalesceAsync: vi.fn().mockImplementation((key: string, fn: () => Promise<unknown>) => {
+      if (key.startsWith('mock_no_coalesce')) {
+        return Promise.resolve(fn());
+      }
+      return actualModule.coalesceAsync(key, fn);
+    }),
   };
 });
 
@@ -32,14 +30,14 @@ describe('caching', () => {
 
   describe('constructor', () => {
     it('should from store', async () => {
-      const store = memoryStore();
-      await expect(caching(store)).resolves.toBeDefined();
+      const store = lruStore();
+      expect(caching(store)).toBeDefined();
     });
   });
 
   describe('get() and set()', () => {
     beforeEach(async () => {
-      cache = await caching('memory');
+      cache = caching(lruStore());
       key = faker.string.alpha(20);
       value = faker.string.sample();
     });
@@ -51,23 +49,19 @@ describe('caching', () => {
     });
 
     it('should error no isCacheable value', () =>
-      expect(cache.set(key, undefined)).rejects.toStrictEqual(
-        new Error('no cacheable value undefined'),
-      ));
+      expect(cache.set(key, undefined)).rejects.toStrictEqual(new Error('no cacheable value undefined')));
     it('should error no isCacheable value', () =>
-      expect(cache.store.mset([[key, undefined]])).rejects.toStrictEqual(
-        new Error('no cacheable value undefined'),
-      ));
+      expect(cache.store.mset([[key, undefined]])).rejects.toStrictEqual(new Error('no cacheable value undefined')));
 
     it('lets us set and get data without a callback', async () => {
-      cache = await caching(async (arg?: MemoryConfig) => memoryStore(arg));
+      cache = caching(lruStore());
       await cache.set(key, value, defaultTtl);
       await sleep(20);
       await expect(cache.get(key)).resolves.toEqual(value);
     });
 
     it('lets us set and get data without options object or callback', async () => {
-      cache = await caching(async (arg?: MemoryConfig) => memoryStore(arg));
+      cache = caching(lruStore());
       await cache.set(key, value);
       await sleep(20);
       await expect(cache.get(key)).resolves.toEqual(value);
@@ -77,7 +71,6 @@ describe('caching', () => {
   describe('mget() and mset()', function () {
     let key2: string;
     let value2: string;
-    const store = 'memory';
 
     beforeEach(async () => {
       key = faker.string.sample(20);
@@ -85,9 +78,7 @@ describe('caching', () => {
       key2 = faker.string.sample(20);
       value2 = faker.string.sample();
 
-      cache = await caching(store, {
-        ttl: defaultTtl,
-      });
+      cache = caching(lruStore({ ttl: defaultTtl }));
     });
 
     it('lets us set and get several keys and data in cache', async () => {
@@ -99,10 +90,7 @@ describe('caching', () => {
         defaultTtl,
       );
       await sleep(20);
-      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-        value,
-        value2,
-      ]);
+      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
     });
 
     it('lets us set and get data without options', async () => {
@@ -114,16 +102,13 @@ describe('caching', () => {
         defaultTtl,
       );
       await sleep(20);
-      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-        value,
-        value2,
-      ]);
+      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
     });
   });
 
   describe('del()', function () {
     beforeEach(async () => {
-      cache = await caching('memory');
+      cache = caching(lruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
       await cache.set(key, value, defaultTtl);
@@ -140,7 +125,7 @@ describe('caching', () => {
       let value2: string;
 
       beforeEach(async () => {
-        cache = await caching('memory');
+        cache = await caching(lruStore());
         key2 = faker.string.sample(20);
         value2 = faker.string.sample();
         await cache.store.mset(
@@ -153,15 +138,9 @@ describe('caching', () => {
       });
 
       it('deletes an an array of keys', async () => {
-        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-          value,
-          value2,
-        ]);
+        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
         await cache.store.mdel(key, key2);
-        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-          undefined,
-          undefined,
-        ]);
+        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([undefined, undefined]);
       });
     });
   });
@@ -171,7 +150,7 @@ describe('caching', () => {
     let value2: string;
 
     beforeEach(async () => {
-      cache = await caching('memory');
+      cache = await caching(lruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
       await cache.set(key, value);
@@ -193,7 +172,7 @@ describe('caching', () => {
 
     beforeEach(async () => {
       keyCount = 10;
-      cache = await caching('memory');
+      cache = await caching(lruStore());
 
       savedKeys = (
         await Promise.all(
@@ -208,21 +187,19 @@ describe('caching', () => {
     });
 
     it('calls back with all keys in cache', () =>
-      expect(
-        cache.store.keys().then((x) => x.sort((a, b) => a.localeCompare(b))),
-      ).resolves.toStrictEqual(savedKeys));
+      expect(cache.store.keys().then((x) => x.sort((a, b) => a.localeCompare(b)))).resolves.toStrictEqual(savedKeys));
   });
 
   describe('wrap()', () => {
     beforeEach(async () => {
-      cache = await caching('memory');
+      cache = await caching(lruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
     });
 
     it('lets us set the ttl to be milliseconds', async () => {
       const ttl = 2 * 1000;
-      await cache.wrap(key, async () => value, ttl);
+      await cache.wrap(key, async () => value, { ttl });
       await expect(cache.get(key)).resolves.toEqual(value);
 
       await sleep(ttl);
@@ -236,7 +213,7 @@ describe('caching', () => {
       const sec = faker.number.int({ min: 2, max: 4 });
       value = faker.string.sample(sec * 2);
       const fn = vi.fn((v: string) => (v.length / 2) * 1000);
-      await cache.wrap(key, async () => value, fn);
+      await cache.wrap(key, async () => value, { ttl: fn });
       await expect(cache.get(key)).resolves.toEqual(value);
       await expect(cache.wrap(key, async () => 'foo')).resolves.toEqual(value);
 
@@ -254,13 +231,13 @@ describe('caching', () => {
 
       // The first request will populate the cache.
       fn.mockClear(); // reset count
-      await expect(cache.wrap(key, fn, ttl)).resolves.toBe(value);
+      await expect(cache.wrap(key, fn, { ttl })).resolves.toBe(value);
       await expect(cache.get(key)).resolves.toBe(value);
       expect(fn).toHaveBeenCalledTimes(1);
 
       // The second request will return the cached value.
       fn.mockClear(); // reset count
-      await expect(cache.wrap(key, fn, ttl)).resolves.toBe(value);
+      await expect(cache.wrap(key, fn, { ttl })).resolves.toBe(value);
       await expect(cache.get(key)).resolves.toBe(value);
       expect(fn).toHaveBeenCalledTimes(0);
     });
@@ -275,7 +252,7 @@ describe('caching', () => {
 
       // Will find the cached value and not call the generator function.
       fn.mockClear(); // reset count
-      await expect(cache.wrap(key, fn, ttl)).resolves.toBe(value);
+      await expect(cache.wrap(key, fn, { ttl })).resolves.toBe(value);
       await expect(cache.get(key)).resolves.toBe(value);
       expect(fn).toHaveBeenCalledTimes(0);
     });
@@ -289,16 +266,16 @@ describe('caching', () => {
 
       // Simulate several concurrent requests for the same value.
       const results = await Promise.allSettled([
-        cache.wrap(key, fn, ttl), // 1
-        cache.wrap(key, fn, ttl), // 2
-        cache.wrap(key, fn, ttl), // 3
-        cache.wrap(key, fn, ttl), // 4
-        cache.wrap(key, fn, ttl), // 5
-        cache.wrap(key, fn, ttl), // 6
-        cache.wrap(key, fn, ttl), // 7
-        cache.wrap(key, fn, ttl), // 8
-        cache.wrap(key, fn, ttl), // 9
-        cache.wrap(key, fn, ttl), // 10
+        cache.wrap(key, fn, { ttl }), // 1
+        cache.wrap(key, fn, { ttl }), // 2
+        cache.wrap(key, fn, { ttl }), // 3
+        cache.wrap(key, fn, { ttl }), // 4
+        cache.wrap(key, fn, { ttl }), // 5
+        cache.wrap(key, fn, { ttl }), // 6
+        cache.wrap(key, fn, { ttl }), // 7
+        cache.wrap(key, fn, { ttl }), // 8
+        cache.wrap(key, fn, { ttl }), // 9
+        cache.wrap(key, fn, { ttl }), // 10
       ]);
 
       // Assert that the function was called exactly once.
@@ -316,15 +293,13 @@ describe('caching', () => {
 
   describe('issues', () => {
     beforeEach(async () => {
-      cache = await caching('memory');
+      cache = await caching(lruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
     });
 
     it('#183', async () => {
-      await expect(cache.wrap('constructor', async () => 0)).resolves.toEqual(
-        0,
-      );
+      await expect(cache.wrap('constructor', async () => 0)).resolves.toEqual(0);
     });
 
     it('#417', async () => {
@@ -339,16 +314,16 @@ describe('caching', () => {
 
       // Simulate several concurrent requests for the same value.
       const results = await Promise.allSettled([
-        cache.wrap(key, fn, ttl), // 1
-        cache.wrap(key, fn, ttl), // 2
-        cache.wrap(key, fn, ttl), // 3
-        cache.wrap(key, fn, ttl), // 4
-        cache.wrap(key, fn, ttl), // 5
-        cache.wrap(key, fn, ttl), // 6
-        cache.wrap(key, fn, ttl), // 7
-        cache.wrap(key, fn, ttl), // 8
-        cache.wrap(key, fn, ttl), // 9
-        cache.wrap(key, fn, ttl), // 10
+        cache.wrap(key, fn, { ttl }), // 1
+        cache.wrap(key, fn, { ttl }), // 2
+        cache.wrap(key, fn, { ttl }), // 3
+        cache.wrap(key, fn, { ttl }), // 4
+        cache.wrap(key, fn, { ttl }), // 5
+        cache.wrap(key, fn, { ttl }), // 6
+        cache.wrap(key, fn, { ttl }), // 7
+        cache.wrap(key, fn, { ttl }), // 8
+        cache.wrap(key, fn, { ttl }), // 9
+        cache.wrap(key, fn, { ttl }), // 10
       ]);
 
       // Assert that the function was called multiple times (bad).
@@ -366,10 +341,14 @@ describe('caching', () => {
     it('#533', async () => {
       await expect(
         (async () => {
-          cache = await caching('memory', {
-            ttl: 5 * 1000,
-            refreshThreshold: 4 * 1000,
-          });
+          const refreshThreshold = 4 * 1000;
+
+          cache = caching(
+            lruStore({
+              ttl: 5 * 1000,
+            }),
+            { refreshThreshold },
+          );
 
           await cache.wrap('refreshThreshold', async () => 0);
           await new Promise((resolve) => {

@@ -1,21 +1,22 @@
 import { describe, it, beforeEach, expect } from 'vitest';
 import { faker } from '@faker-js/faker';
 
-import { caching, MemoryCache, MemoryStore, memoryStore } from '../../src';
 import { sleep } from '../utils';
+import { LRUStore, lruStore } from '../../src/stores';
+import { caching, Cache } from '../../src';
 
 describe('memory store', () => {
   describe('instantiating', () => {
     it('lets us pass in no args', () => {
-      memoryStore();
+      lruStore();
     });
   });
 
   describe('ttl', function () {
-    let store: MemoryStore;
+    let store: LRUStore;
 
     beforeEach(() => {
-      store = memoryStore();
+      store = lruStore();
     });
 
     it('if options arg is a number in set()', async () => {
@@ -25,7 +26,7 @@ describe('memory store', () => {
     });
 
     it('when ttl arg is passed 0', async () => {
-      const store = memoryStore({ ttl: 1 });
+      const store = lruStore({ ttl: 1 });
       await store.set('foo', 'bar', 0);
       await sleep(20);
       await expect(store.get('foo')).resolves.toEqual('bar');
@@ -39,10 +40,10 @@ describe('memory store', () => {
   });
 
   describe('sizeCalculation', function () {
-    let store: MemoryStore;
+    let store: LRUStore;
 
     beforeEach(() => {
-      store = memoryStore({
+      store = lruStore({
         ttl: 0,
         maxSize: 10,
         sizeCalculation: (v, k) => JSON.stringify(v).length + k.length,
@@ -52,9 +53,7 @@ describe('memory store', () => {
     it('calculatedSize and sizeCalcuation must be the same', async function () {
       await store.set('foo', 'bar');
 
-      expect(store.calculatedSize).toEqual(
-        JSON.stringify('bar').length + 'foo'.length,
-      );
+      expect(store.calculatedSize).toEqual(JSON.stringify('bar').length + 'foo'.length);
     });
 
     it('should cache new value and drop the old one(s) if maxSize is reached', async function () {
@@ -88,7 +87,7 @@ describe('memory store', () => {
 
     it('should throw if invalid sizeCalculation function is passed', () => {
       expect(() =>
-        memoryStore({
+        lruStore({
           // @ts-expect-error testing if this actually throws
           sizeCalculation: () => {
             return 'invalid-type';
@@ -99,13 +98,13 @@ describe('memory store', () => {
   });
 
   describe('keyCount', function () {
-    let memoryCache: MemoryStore;
+    let memoryCache: LRUStore;
 
     /**
      * Note, stale keys are included in keyCount before those keys are attempted to be accessed", function(done) {
      */
     it('return total length of keys in cache', async () => {
-      memoryCache = memoryStore({ ttl: 10 });
+      memoryCache = lruStore({ ttl: 10 });
       await memoryCache.set('foo', 'bar');
       await memoryCache.set('bar', 'foo', 100);
       expect(memoryCache.size).toEqual(2);
@@ -116,7 +115,7 @@ describe('memory store', () => {
   });
 
   describe('when used with wrap() function', () => {
-    let cache: MemoryCache;
+    let cache: Cache;
     const ttl = 0;
 
     describe('when cache misses', () => {
@@ -126,11 +125,7 @@ describe('memory store', () => {
       });
 
       function getCachedObject() {
-        return cache.wrap(
-          key,
-          async () => ({ foo: 'bar', arr: [1, 2, 3] }),
-          10 * 1000,
-        );
+        return cache.wrap(key, async () => ({ foo: 'bar', arr: [1, 2, 3] }), { ttl: 10 * 1000 });
       }
 
       function getCachedString() {
@@ -162,23 +157,19 @@ describe('memory store', () => {
       function assertCachedObjectWithPrototype(result: typeof Thing.prototype) {
         expect(typeof result).toEqual('object');
         const prototype = Object.getPrototypeOf(result);
-        expect(
-          typeof prototype.f,
-          'prototype does not have function f',
-        ).toEqual('function');
+        expect(typeof prototype.f, 'prototype does not have function f').toEqual('function');
 
-        expect(
-          result.f(),
-          'prototype function f does not return expected value',
-        ).toEqual('foo');
+        expect(result.f(), 'prototype function f does not return expected value').toEqual('foo');
       }
 
       // By default, memory store clones values before setting in the set method.
       describe('when shouldCloneBeforeSet option is not passed in', () => {
         beforeEach(async () => {
-          cache = await caching('memory', {
-            ttl: ttl,
-          });
+          cache = await caching(
+            lruStore({
+              ttl,
+            }),
+          );
         });
 
         it('does not allow mutation of objects', async () => {
@@ -223,10 +214,12 @@ describe('memory store', () => {
 
       describe('when shouldCloneBeforeSet=false option is passed in', () => {
         beforeEach(async () => {
-          cache = await caching('memory', {
-            ttl: ttl,
-            shouldCloneBeforeSet: false,
-          });
+          cache = await caching(
+            lruStore({
+              ttl,
+              shouldCloneBeforeSet: false,
+            }),
+          );
         });
 
         it('does allow mutation of objects', async () => {
@@ -280,10 +273,12 @@ describe('memory store', () => {
           key2 = faker.string.sample(20);
           value2 = faker.string.sample();
 
-          cache = await caching('memory', {
-            shouldCloneBeforeSet: false,
-            ttl: defaultTtl,
-          });
+          cache = await caching(
+            lruStore({
+              shouldCloneBeforeSet: false,
+              ttl: defaultTtl,
+            }),
+          );
         });
 
         it('lets us set and get several keys and data in cache', async () => {
@@ -295,10 +290,7 @@ describe('memory store', () => {
             defaultTtl,
           );
           await sleep(20);
-          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-            value,
-            value2,
-          ]);
+          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
         });
 
         it('lets us set and get data without options', async () => {
@@ -310,17 +302,14 @@ describe('memory store', () => {
             defaultTtl,
           );
           await sleep(20);
-          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([
-            value,
-            value2,
-          ]);
+          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
         });
       });
     });
   });
 
   describe('dump()', function () {
-    let memoryCache: MemoryStore;
+    let memoryCache: LRUStore;
     let key1: string;
     let value1: string;
     let key2: string;
@@ -334,7 +323,7 @@ describe('memory store', () => {
     });
 
     it('lets us dump data', () => {
-      memoryCache = memoryStore();
+      memoryCache = lruStore();
       memoryCache.set(key1, value1);
       memoryCache.set(key2, value2);
 
@@ -347,7 +336,7 @@ describe('memory store', () => {
   });
 
   describe('load()', function () {
-    let memoryCache: MemoryStore;
+    let memoryCache: LRUStore;
     let key1: string;
     let value1: string;
     let key2: string;
@@ -366,8 +355,7 @@ describe('memory store', () => {
     });
 
     it('lets us load data', async () => {
-      memoryCache = memoryStore();
-
+      memoryCache = lruStore();
       memoryCache.load(data);
       await expect(memoryCache.get(key1)).resolves.toEqual(value1);
       await expect(memoryCache.get(key2)).resolves.toEqual(value2);

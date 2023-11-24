@@ -1,14 +1,13 @@
-import { Cache, Milliseconds, WrapTTL } from './caching';
+import { coalesceAsync } from 'promise-coalesce';
+import { Cache, Milliseconds, WrapOptions } from './types';
+import { resolveTTL } from './utils';
 
-export type MultiCache = Omit<Cache, 'store'> &
-  Pick<Cache['store'], 'mset' | 'mget' | 'mdel'>;
+export type MultiCache = Omit<Cache, 'store'> & Pick<Cache['store'], 'mset' | 'mget' | 'mdel'>;
 
 /**
  * Module that lets you specify a hierarchy of caches.
  */
-export function multiCaching<Caches extends Cache[]>(
-  caches: Caches,
-): MultiCache {
+export const multiCaching = <C extends Cache[]>(caches: C): MultiCache => {
   const get = async <T>(key: string) => {
     for (const cache of caches) {
       try {
@@ -17,11 +16,7 @@ export function multiCaching<Caches extends Cache[]>(
       } catch (e) {}
     }
   };
-  const set = async <T>(
-    key: string,
-    data: T,
-    ttl?: Milliseconds | undefined,
-  ) => {
+  const set = async <T>(key: string, data: T, ttl?: Milliseconds | undefined) => {
     await Promise.all(caches.map((cache) => cache.set(key, data, ttl)));
   };
 
@@ -31,33 +26,28 @@ export function multiCaching<Caches extends Cache[]>(
     del: async (key) => {
       await Promise.all(caches.map((cache) => cache.del(key)));
     },
-    async wrap<T>(
-      key: string,
-      fn: () => Promise<T>,
-      ttl?: WrapTTL<T>,
-    ): Promise<T> {
-      let value: T | undefined;
-      let i = 0;
-      for (; i < caches.length; i++) {
-        try {
-          value = await caches[i].get<T>(key);
-          if (value !== undefined) break;
-        } catch (e) {}
-      }
-      if (value === undefined) {
-        const result = await fn();
-        const cacheTTL = typeof ttl === 'function' ? ttl(result) : ttl;
-        await set<T>(key, result, cacheTTL);
-        return result;
-      } else {
-        const cacheTTL = typeof ttl === 'function' ? ttl(value) : ttl;
-        Promise.all(
-          caches.slice(0, i).map((cache) => cache.set(key, value, cacheTTL)),
-        ).then();
-        caches[i].wrap(key, fn, ttl).then(); // call wrap for store for internal refreshThreshold logic, see: src/caching.ts caching.wrap
-      }
-      return value;
-    },
+    wrap: async <T>(key: string, fn: () => Promise<T>, options?: WrapOptions<T>): Promise<T> =>
+      coalesceAsync(key, async () => {
+        let value: T | undefined;
+        let i = 0;
+        for (; i < caches.length; i++) {
+          try {
+            value = await caches[i].get<T>(key);
+            if (value !== undefined) break;
+          } catch (e) {}
+        }
+        if (value === undefined) {
+          const result = await fn();
+          const cacheTTL = resolveTTL(result, options?.ttl);
+          await set<T>(key, result, cacheTTL);
+          return result;
+        } else {
+          const cacheTTL = resolveTTL(value, options?.ttl);
+          Promise.all(caches.slice(0, i).map((cache) => cache.set(key, value, cacheTTL))).then();
+          caches[i].wrap(key, fn, options).then(); // call wrap for store for internal refreshThreshold logic, see: src/caching.ts caching.wrap
+        }
+        return value;
+      }),
     reset: async () => {
       await Promise.all(caches.map((x) => x.reset()));
     },
@@ -81,4 +71,4 @@ export function multiCaching<Caches extends Cache[]>(
       await Promise.all(caches.map((cache) => cache.store.mdel(...keys)));
     },
   };
-}
+};

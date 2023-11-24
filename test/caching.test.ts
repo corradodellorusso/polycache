@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Cache, caching } from '../src';
 import { sleep } from './utils';
-import { lruStore } from '../src/stores';
+import { createLruStore } from '../src/stores';
 
 // Allow the module to be mocked so we can assert
 // the old and new behavior for issue #417
@@ -30,14 +30,14 @@ describe('caching', () => {
 
   describe('constructor', () => {
     it('should from store', async () => {
-      const store = lruStore();
+      const store = createLruStore();
       expect(caching(store)).toBeDefined();
     });
   });
 
   describe('get() and set()', () => {
     beforeEach(async () => {
-      cache = caching(lruStore());
+      cache = caching(createLruStore());
       key = faker.string.alpha(20);
       value = faker.string.sample();
     });
@@ -51,24 +51,24 @@ describe('caching', () => {
     it('should error no isCacheable value', () =>
       expect(cache.set(key, undefined)).rejects.toStrictEqual(new Error('no cacheable value undefined')));
     it('should error no isCacheable value', () =>
-      expect(cache.store.mset([[key, undefined]])).rejects.toStrictEqual(new Error('no cacheable value undefined')));
+      expect(cache.store.setMany([[key, undefined]])).rejects.toStrictEqual(new Error('no cacheable value undefined')));
 
     it('lets us set and get data without a callback', async () => {
-      cache = caching(lruStore());
+      cache = caching(createLruStore());
       await cache.set(key, value, defaultTtl);
       await sleep(20);
       await expect(cache.get(key)).resolves.toEqual(value);
     });
 
     it('lets us set and get data without options object or callback', async () => {
-      cache = caching(lruStore());
+      cache = caching(createLruStore());
       await cache.set(key, value);
       await sleep(20);
       await expect(cache.get(key)).resolves.toEqual(value);
     });
   });
 
-  describe('mget() and mset()', function () {
+  describe('getMany() and setMany()', function () {
     let key2: string;
     let value2: string;
 
@@ -78,11 +78,11 @@ describe('caching', () => {
       key2 = faker.string.sample(20);
       value2 = faker.string.sample();
 
-      cache = caching(lruStore({ ttl: defaultTtl }));
+      cache = caching(createLruStore({ ttl: defaultTtl }));
     });
 
     it('lets us set and get several keys and data in cache', async () => {
-      await cache.store.mset(
+      await cache.store.setMany(
         [
           [key, value],
           [key2, value2],
@@ -90,11 +90,11 @@ describe('caching', () => {
         defaultTtl,
       );
       await sleep(20);
-      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
+      await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([value, value2]);
     });
 
     it('lets us set and get data without options', async () => {
-      await cache.store.mset(
+      await cache.store.setMany(
         [
           [key, value],
           [key2, value2],
@@ -102,13 +102,13 @@ describe('caching', () => {
         defaultTtl,
       );
       await sleep(20);
-      await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
+      await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([value, value2]);
     });
   });
 
   describe('del()', function () {
     beforeEach(async () => {
-      cache = caching(lruStore());
+      cache = caching(createLruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
       await cache.set(key, value, defaultTtl);
@@ -125,10 +125,10 @@ describe('caching', () => {
       let value2: string;
 
       beforeEach(async () => {
-        cache = await caching(lruStore());
+        cache = await caching(createLruStore());
         key2 = faker.string.sample(20);
         value2 = faker.string.sample();
-        await cache.store.mset(
+        await cache.store.setMany(
           [
             [key, value],
             [key2, value2],
@@ -138,9 +138,9 @@ describe('caching', () => {
       });
 
       it('deletes an an array of keys', async () => {
-        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
-        await cache.store.mdel(key, key2);
-        await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([undefined, undefined]);
+        await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([value, value2]);
+        await cache.store.delMany(key, key2);
+        await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([undefined, undefined]);
       });
     });
   });
@@ -150,7 +150,7 @@ describe('caching', () => {
     let value2: string;
 
     beforeEach(async () => {
-      cache = await caching(lruStore());
+      cache = await caching(createLruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
       await cache.set(key, value);
@@ -172,7 +172,7 @@ describe('caching', () => {
 
     beforeEach(async () => {
       keyCount = 10;
-      cache = await caching(lruStore());
+      cache = await caching(createLruStore());
 
       savedKeys = (
         await Promise.all(
@@ -192,7 +192,7 @@ describe('caching', () => {
 
   describe('wrap()', () => {
     beforeEach(async () => {
-      cache = await caching(lruStore());
+      cache = await caching(createLruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
     });
@@ -293,7 +293,7 @@ describe('caching', () => {
 
   describe('issues', () => {
     beforeEach(async () => {
-      cache = await caching(lruStore());
+      cache = await caching(createLruStore());
       key = faker.string.sample(20);
       value = faker.string.sample();
     });
@@ -344,7 +344,7 @@ describe('caching', () => {
           const refreshThreshold = 4 * 1000;
 
           cache = caching(
-            lruStore({
+            createLruStore({
               ttl: 5 * 1000,
             }),
             { refreshThreshold },

@@ -1,13 +1,14 @@
 export type Milliseconds = number;
 
 export type Store = {
+  name: string;
   get<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, data: T, ttl?: Milliseconds): Promise<void>;
   del(key: string): Promise<void>;
   reset(): Promise<void>;
-  mset(args: [string, unknown][], ttl?: Milliseconds): Promise<void>;
-  mget(...args: string[]): Promise<unknown[]>;
-  mdel(...args: string[]): Promise<void>;
+  setMany(args: [string, unknown][], ttl?: Milliseconds): Promise<void>;
+  getMany(...args: string[]): Promise<unknown[]>;
+  delMany(...args: string[]): Promise<void>;
   keys(pattern?: string): Promise<string[]>;
   ttl(key: string): Promise<number>;
 };
@@ -27,6 +28,6 @@ export type Cache<S extends Store = Store> = {
   get: <T>(key: string) => Promise<T | undefined>;
   del: (key: string) => Promise<void>;
   reset: () => Promise<void>;
-  wrap<T>(key: string, fn: () => Promise<T>, ttl?: WrapOptions<T>): Promise<T>;
+  wrap: <T>(key: string, fn: () => Promise<T>, ttl?: WrapOptions<T>) => Promise<T>;
   store: S;
 };

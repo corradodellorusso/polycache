@@ -29,7 +29,7 @@ export type LRUStore = Store & {
 /**
  * Wrapper for lru-cache.
  */
-export function lruStore(args?: LRUConfig): LRUStore {
+export const createLruStore = (args?: LRUConfig): LRUStore => {
   const shouldCloneBeforeSet = args?.shouldCloneBeforeSet !== false; // clone by default
   const isCacheable = args?.isCacheable ?? ((val) => val !== undefined);
 
@@ -43,13 +43,14 @@ export function lruStore(args?: LRUConfig): LRUStore {
   const lruCache = new LRUCache(lruOpts);
 
   return {
+    name: 'memory-lru',
     del: async (key) => {
       lruCache.delete(key);
     },
     get: async <T>(key: string) => lruCache.get(key) as T,
     keys: async () => [...lruCache.keys()],
-    mget: async (...args) => args.map((x) => lruCache.get(x)),
-    mset: async (args, ttl?) => {
+    getMany: async (...args) => args.map((x) => lruCache.get(x)),
+    setMany: async (args, ttl?) => {
       const opt = { ttl: ttl !== undefined ? ttl : lruOpts.ttl } as const;
       for (const [key, value] of args) {
         if (!isCacheable(value)) {
@@ -63,7 +64,7 @@ export function lruStore(args?: LRUConfig): LRUStore {
         }
       }
     },
-    mdel: async (...args) => {
+    delMany: async (...args) => {
       for (const key of args) {
         lruCache.delete(key);
       }
@@ -100,4 +101,4 @@ export function lruStore(args?: LRUConfig): LRUStore {
      */
     load: (...args: Parameters<LRU['load']>) => lruCache.load(...args),
   };
-}
+};

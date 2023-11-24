@@ -2,7 +2,7 @@ import { coalesceAsync } from 'promise-coalesce';
 import { Cache, Milliseconds, WrapOptions } from './types';
 import { resolveTTL } from './utils';
 
-export type MultiCache = Omit<Cache, 'store'> & Pick<Cache['store'], 'mset' | 'mget' | 'mdel'>;
+export type MultiCache = Omit<Cache, 'store'> & Pick<Cache['store'], 'setMany' | 'getMany' | 'delMany'>;
 
 /**
  * Module that lets you specify a hierarchy of caches.
@@ -51,12 +51,12 @@ export const multiCaching = <C extends Cache[]>(caches: C): MultiCache => {
     reset: async () => {
       await Promise.all(caches.map((x) => x.reset()));
     },
-    mget: async (...keys: string[]) => {
+    getMany: async (...keys: string[]) => {
       const values = new Array(keys.length).fill(undefined);
       for (const cache of caches) {
         if (values.every((x) => x !== undefined)) break;
         try {
-          const val = await cache.store.mget(...keys);
+          const val = await cache.store.getMany(...keys);
           val.forEach((v, i) => {
             if (values[i] === undefined && v !== undefined) values[i] = v;
           });
@@ -64,11 +64,11 @@ export const multiCaching = <C extends Cache[]>(caches: C): MultiCache => {
       }
       return values;
     },
-    mset: async (args: [string, unknown][], ttl?: Milliseconds) => {
-      await Promise.all(caches.map((cache) => cache.store.mset(args, ttl)));
+    setMany: async (args: [string, unknown][], ttl?: Milliseconds) => {
+      await Promise.all(caches.map((cache) => cache.store.setMany(args, ttl)));
     },
-    mdel: async (...keys: string[]) => {
-      await Promise.all(caches.map((cache) => cache.store.mdel(...keys)));
+    delMany: async (...keys: string[]) => {
+      await Promise.all(caches.map((cache) => cache.store.delMany(...keys)));
     },
   };
 };

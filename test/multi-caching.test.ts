@@ -4,7 +4,7 @@ import { faker } from '@faker-js/faker';
 import { sleep } from './utils';
 
 import { Cache, caching, MultiCache, multiCaching, Store } from '../src';
-import { lruStore } from '../src/stores';
+import { createLruStore } from '../src/stores';
 
 describe('multiCaching', () => {
   let memoryCache: Cache;
@@ -18,7 +18,7 @@ describe('multiCaching', () => {
   async function multiMset() {
     const keys = [faker.string.sample(20), faker.string.sample(20)];
     const values = [faker.string.sample(), faker.string.sample()];
-    await multiCache.mset(
+    await multiCache.setMany(
       [
         [keys[0], values[0]],
         [keys[1], values[1]],
@@ -33,17 +33,17 @@ describe('multiCaching', () => {
     defaultTtl = 5000;
 
     memoryCache = caching(
-      lruStore({
+      createLruStore({
         ttl,
       }),
     );
     memoryCache2 = caching(
-      lruStore({
+      createLruStore({
         ttl,
       }),
     );
     memoryCache3 = caching(
-      lruStore({
+      createLruStore({
         ttl,
       }),
     );
@@ -51,7 +51,7 @@ describe('multiCaching', () => {
     key = faker.string.sample(20);
   });
 
-  describe('get(), set(), del(), reset(), mget(), mset()', () => {
+  describe('get(), set(), del(), reset(), getMany(), setMany()', () => {
     let value: string;
 
     beforeEach(() => {
@@ -136,7 +136,7 @@ describe('multiCaching', () => {
       });
     });
 
-    describe('mset()', () => {
+    describe('setMany()', () => {
       it('lets us set multiple keys in all caches', async () => {
         const { keys, values } = await multiMset();
         await expect(memoryCache.get(keys[0])).resolves.toEqual(values[0]);
@@ -148,26 +148,26 @@ describe('multiCaching', () => {
       });
     });
 
-    describe('mget()', () => {
+    describe('getMany()', () => {
       it('lets us get multiple keys', async () => {
         const { keys, values } = await multiMset();
         await multiCache.set(keys[0], values[0], defaultTtl);
         await memoryCache3.set(keys[1], values[1], defaultTtl);
-        await expect(multiCache.mget(...keys)).resolves.toStrictEqual(values);
+        await expect(multiCache.getMany(...keys)).resolves.toStrictEqual(values);
       });
 
       it('lets us get multiple undefined', async () => {
         const len = 4;
         await multiMset();
         const args = new Array(len).fill('').map(() => faker.string.sample());
-        await expect(multiCache.mget(...args)).resolves.toStrictEqual(new Array(len).fill(undefined));
+        await expect(multiCache.getMany(...args)).resolves.toStrictEqual(new Array(len).fill(undefined));
       });
     });
 
-    describe('mdel()', () => {
+    describe('delMany()', () => {
       it('lets us delete multiple keys', async () => {
         const { keys } = await multiMset();
-        await multiCache.mdel(...keys);
+        await multiCache.delMany(...keys);
         await expect(memoryCache.get(keys[0])).resolves.toBeUndefined();
         await expect(memoryCache.get(keys[1])).resolves.toBeUndefined();
       });
@@ -224,8 +224,8 @@ describe('multiCaching', () => {
 
   describe('issues', () => {
     it('#253', async () => {
-      const cache0 = caching(lruStore({ ttl: 500 }));
-      const cache1 = caching(lruStore({ ttl: 1000 }));
+      const cache0 = caching(createLruStore({ ttl: 500 }));
+      const cache1 = caching(createLruStore({ ttl: 1000 }));
       const multi = multiCaching([cache0, cache1]);
       const key = 'bar';
       const value = 'foo';

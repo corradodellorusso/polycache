@@ -2,13 +2,20 @@ import { describe, it, beforeEach, expect } from 'vitest';
 import { faker } from '@faker-js/faker';
 
 import { sleep } from '../utils';
-import { LRUStore, lruStore } from '../../src/stores';
+import { LRUStore, createLruStore } from '../../src/stores';
 import { caching, Cache } from '../../src';
 
 describe('memory store', () => {
   describe('instantiating', () => {
     it('lets us pass in no args', () => {
-      lruStore();
+      createLruStore();
+    });
+  });
+
+  describe('name', () => {
+    it('has the right name', () => {
+      let store = createLruStore();
+      expect(store.name).toEqual('memory-lru');
     });
   });
 
@@ -16,7 +23,7 @@ describe('memory store', () => {
     let store: LRUStore;
 
     beforeEach(() => {
-      store = lruStore();
+      store = createLruStore();
     });
 
     it('if options arg is a number in set()', async () => {
@@ -26,7 +33,7 @@ describe('memory store', () => {
     });
 
     it('when ttl arg is passed 0', async () => {
-      const store = lruStore({ ttl: 1 });
+      const store = createLruStore({ ttl: 1 });
       await store.set('foo', 'bar', 0);
       await sleep(20);
       await expect(store.get('foo')).resolves.toEqual('bar');
@@ -43,7 +50,7 @@ describe('memory store', () => {
     let store: LRUStore;
 
     beforeEach(() => {
-      store = lruStore({
+      store = createLruStore({
         ttl: 0,
         maxSize: 10,
         sizeCalculation: (v, k) => JSON.stringify(v).length + k.length,
@@ -87,7 +94,7 @@ describe('memory store', () => {
 
     it('should throw if invalid sizeCalculation function is passed', () => {
       expect(() =>
-        lruStore({
+        createLruStore({
           // @ts-expect-error testing if this actually throws
           sizeCalculation: () => {
             return 'invalid-type';
@@ -104,7 +111,7 @@ describe('memory store', () => {
      * Note, stale keys are included in keyCount before those keys are attempted to be accessed", function(done) {
      */
     it('return total length of keys in cache', async () => {
-      memoryCache = lruStore({ ttl: 10 });
+      memoryCache = createLruStore({ ttl: 10 });
       await memoryCache.set('foo', 'bar');
       await memoryCache.set('bar', 'foo', 100);
       expect(memoryCache.size).toEqual(2);
@@ -166,7 +173,7 @@ describe('memory store', () => {
       describe('when shouldCloneBeforeSet option is not passed in', () => {
         beforeEach(async () => {
           cache = await caching(
-            lruStore({
+            createLruStore({
               ttl,
             }),
           );
@@ -215,7 +222,7 @@ describe('memory store', () => {
       describe('when shouldCloneBeforeSet=false option is passed in', () => {
         beforeEach(async () => {
           cache = await caching(
-            lruStore({
+            createLruStore({
               ttl,
               shouldCloneBeforeSet: false,
             }),
@@ -261,7 +268,7 @@ describe('memory store', () => {
         assertCachedObjectWithPrototype(await getCachedObjectWithPrototype());
         assertCachedObjectWithPrototype(await getCachedObjectWithPrototype());
       });
-      describe('mget() and mset()', function () {
+      describe('getMany() and setMany()', function () {
         let value: string;
         let key2: string;
         let value2: string;
@@ -274,7 +281,7 @@ describe('memory store', () => {
           value2 = faker.string.sample();
 
           cache = await caching(
-            lruStore({
+            createLruStore({
               shouldCloneBeforeSet: false,
               ttl: defaultTtl,
             }),
@@ -282,7 +289,7 @@ describe('memory store', () => {
         });
 
         it('lets us set and get several keys and data in cache', async () => {
-          await cache.store.mset(
+          await cache.store.setMany(
             [
               [key, value],
               [key2, value2],
@@ -290,11 +297,11 @@ describe('memory store', () => {
             defaultTtl,
           );
           await sleep(20);
-          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
+          await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([value, value2]);
         });
 
         it('lets us set and get data without options', async () => {
-          await cache.store.mset(
+          await cache.store.setMany(
             [
               [key, value],
               [key2, value2],
@@ -302,7 +309,7 @@ describe('memory store', () => {
             defaultTtl,
           );
           await sleep(20);
-          await expect(cache.store.mget(key, key2)).resolves.toStrictEqual([value, value2]);
+          await expect(cache.store.getMany(key, key2)).resolves.toStrictEqual([value, value2]);
         });
       });
     });
@@ -323,7 +330,7 @@ describe('memory store', () => {
     });
 
     it('lets us dump data', () => {
-      memoryCache = lruStore();
+      memoryCache = createLruStore();
       memoryCache.set(key1, value1);
       memoryCache.set(key2, value2);
 
@@ -355,7 +362,7 @@ describe('memory store', () => {
     });
 
     it('lets us load data', async () => {
-      memoryCache = lruStore();
+      memoryCache = createLruStore();
       memoryCache.load(data);
       await expect(memoryCache.get(key1)).resolves.toEqual(value1);
       await expect(memoryCache.get(key2)).resolves.toEqual(value2);

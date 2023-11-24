@@ -9,8 +9,8 @@ export const buildMockStore = (): Store => ({
   set: vi.fn(),
   del: vi.fn(),
   keys: vi.fn(),
-  mset: vi.fn(),
+  setMany: vi.fn(),
   reset: vi.fn(),
-  mget: vi.fn(),
-  mdel: vi.fn(),
+  getMany: vi.fn(),
+  delMany: vi.fn(),
 });

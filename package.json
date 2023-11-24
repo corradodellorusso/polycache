@@ -1,6 +1,6 @@
 {
-  "name": "cache-manager",
-  "version": "5.3.1",
+  "name": "polycache-core",
+  "version": "0.0.1",
   "description": "Cache module for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,10 +10,10 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "vitest run --coverage",
-    "release": "yarn check && yarn test -- --run && yarn build",
-    "prepare": "yarn build",
-    "fix": "yarn lint && yarn fmt",
-    "check": "yarn lint:check && yarn fmt:check",
+    "release": "npm run check && npm run test -- --run && npm run build",
+    "prepare": "npm run build",
+    "fix": "npm run lint && npm run fmt",
+    "check": "npm run lint:check && npm run fmt:check",
     "lint": "eslint --cache --max-warnings 0 --fix '**/*.{ts,mts,js}'",
     "fmt": "prettier --write '**/*.{md,json,yml}'",
     "lint:check": "eslint --cache --max-warnings 0 '**/*.{ts,mts,js}'",
@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/node-cache-manager/node-cache-manager.git"
+    "url": "https://github.com/corradodellorusso/polycache.git"
   },
   "keywords": [
     "cache",
@@ -41,6 +41,10 @@
     {
       "name": "Juan Aguilar Santillana",
       "email": "mhpoin@gmail.com"
+    },
+    {
+      "name": "Corrado dello Russo",
+      "email": "info@corradodellorusso.it"
     }
   ],
   "license": "MIT",

@@ -1,9 +1,9 @@
-# node-cache-manager 
-[![codecov](https://codecov.io/gh/node-cache-manager/node-cache-manager/branch/master/graph/badge.svg?token=ZV3G5IFigq)](https://codecov.io/gh/node-cache-manager/node-cache-manager)
-[![tests](https://github.com/node-cache-manager/node-cache-manager/actions/workflows/test.yml/badge.svg)](https://github.com/node-cache-manager/node-cache-manager/actions/workflows/test.yml)
-[![license](https://img.shields.io/github/license/node-cache-manager/node-cache-manager)](https://github.com/node-cache-manager/node-cache-manager/blob/master/LICENSE)
-[![npm](https://img.shields.io/npm/dm/cache-manager)](https://npmjs.com/package/cache-manager)
-![npm](https://img.shields.io/npm/v/cache-manager)
+# polycache
+[![codecov](https://codecov.io/gh/corradodellorusso/polycache/branch/master/graph/badge.svg?token=ZV3G5IFigq)](https://codecov.io/gh/corradodellorusso/polycache)
+[![tests](https://github.com/corradodellorusso/polycache/actions/workflows/test.yml/badge.svg)](https://github.com/corradodellorusso/polycache/actions/workflows/test.yml)
+[![license](https://img.shields.io/github/license/corradodellorusso/polycache)](https://github.com/corradodellorusso/polycache/blob/master/LICENSE)
+[![npm](https://img.shields.io/npm/dm/polycache-core)](https://npmjs.com/package/cache-manager)
+![npm](https://img.shields.io/npm/v/polycache-core)
 
 # Flexible NodeJS cache module
 
@@ -20,7 +20,7 @@ A cache module for nodejs that allows easy wrapping of functions in cache, tiere
 
 ## Installation
 
-    pnpm install cache-manager
+    npm install cache-manager
 
 ## Usage Examples
 
@@ -74,15 +74,8 @@ console.log(await memoryCache.store.mget('foo', 'foo2'));
 await memoryCache.store.mdel('foo', 'foo2');
 ```
 
-#### [Example Express App Usage](./examples/express/src/index.mts)
-
 #### Custom Stores
-
-You can use your own custom store by creating one with the same API as the built-in memory stores.
-
-- [Example Custom Store lru-cache](./src/stores/memory.ts)
-- [Example Custom Store redis](https://github.com/node-cache-manager/node-cache-manager-redis-yet)
-- [Example Custom Store ioredis](https://github.com/node-cache-manager/node-cache-manager-ioredis-yet)
+Under construction...
 
 ### Multi-Store
 
@@ -158,38 +151,8 @@ const memoryCache = await caching('memory', {
 When a value will be retrieved from Redis with a TTL minor than 3sec, the value will be updated in the background.
 
 ## Store Engines
+Under construction...
 
-### Official and updated to last version
-
-- [node-cache-manager-redis-yet](https://github.com/node-cache-manager/node-cache-manager-redis-yet) (uses [node_redis](https://github.com/NodeRedis/node_redis))
-
-- [node-cache-manager-ioredis-yet](https://github.com/node-cache-manager/node-cache-manager-ioredis-yet) (uses [ioredis](https://github.com/luin/ioredis))
-
-### Third party
-
-- [node-cache-manager-redis](https://github.com/dial-once/node-cache-manager-redis) (uses [sol-redis-pool](https://github.com/joshuah/sol-redis-pool))
-
-- [node-cache-manager-redis-store](https://github.com/dabroek/node-cache-manager-redis-store) (uses [node_redis](https://github.com/NodeRedis/node_redis))
-
-- [node-cache-manager-ioredis](https://github.com/Tirke/node-cache-manager-ioredis) (uses [ioredis](https://github.com/luin/ioredis))
-
-- [node-cache-manager-mongodb](https://github.com/v4l3r10/node-cache-manager-mongodb)
-
-- [node-cache-manager-mongoose](https://github.com/disjunction/node-cache-manager-mongoose)
-
-- [node-cache-manager-fs-binary](https://github.com/sheershoff/node-cache-manager-fs-binary)
-
-- [node-cache-manager-fs-hash](https://github.com/rolandstarke/node-cache-manager-fs-hash)
-
-- [node-cache-manager-hazelcast](https://github.com/marudor/node-cache-manager-hazelcast)
-
-- [node-cache-manager-memcached-store](https://github.com/theogravity/node-cache-manager-memcached-store)
-
-- [node-cache-manager-memory-store](https://github.com/theogravity/node-cache-manager-memory-store)
-
-- [node-cache-manager-couchbase](https://github.com/davidepellegatta/node-cache-manager-couchbase)
-
-- [node-cache-manager-sqlite](https://github.com/maxpert/node-cache-manager-sqlite)
 
 ## Contribute
 
@@ -198,4 +161,4 @@ for any new features or bug fixes.
 
 ## License
 
-node-cache-manager is licensed under the [MIT license](./LICENSE).
+polycache is licensed under the [MIT license](./LICENSE).

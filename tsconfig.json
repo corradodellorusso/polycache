@@ -9,7 +9,8 @@
     "outDir": "dist",
     "declaration": true,
     "incremental": true,
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "skipLibCheck": true
   },
   "exclude": ["dist"]
 }

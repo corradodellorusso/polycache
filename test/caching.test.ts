@@ -2,9 +2,8 @@ import { faker } from '@faker-js/faker';
 import promiseCoalesce from 'promise-coalesce';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Cache, caching } from '../src';
+import { Cache, caching, createLruStore } from '../src';
 import { sleep } from './utils';
-import { createLruStore } from '../src/stores';
 
 // Allow the module to be mocked so we can assert
 // the old and new behavior for issue #417

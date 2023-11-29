@@ -3,8 +3,7 @@ import { faker } from '@faker-js/faker';
 
 import { sleep } from './utils';
 
-import { Cache, caching, MultiCache, multiCaching, Store } from '../src';
-import { createLruStore } from '../src/stores';
+import { Cache, caching, MultiCache, multiCaching, Store, createLruStore } from '../src';
 
 describe('multiCaching', () => {
   let memoryCache: Cache;
